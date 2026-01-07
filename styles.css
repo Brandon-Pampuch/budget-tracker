@@ -167,6 +167,22 @@ input::placeholder {
     color: var(--text-secondary);
 }
 
+.datetime-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.datetime-inputs input {
+    padding: 0.875rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
 .type-selector {
     display: flex;
     gap: 1rem;
@@ -255,11 +271,21 @@ input::placeholder {
 
 .transaction-description {
     font-weight: 500;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.transaction-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
 }
 
 .transaction-category {
-    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.transaction-date {
     color: var(--text-secondary);
 }
 

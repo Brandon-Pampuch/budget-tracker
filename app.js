@@ -1,5 +1,7 @@
 class BudgetApp {
     constructor() {
+        this.initialBalance = 18957.40;
+        this.initialBalanceDate = '2026-01-06T00:00:00';
         this.transactions = this.loadTransactions();
         this.init();
     }
@@ -13,11 +15,40 @@ class BudgetApp {
         this.updateUI();
         this.registerServiceWorker();
         this.setupNotifications();
+        this.setDefaultDateTime();
     }
 
     loadTransactions() {
         const stored = localStorage.getItem('transactions');
-        return stored ? JSON.parse(stored) : [];
+        const transactions = stored ? JSON.parse(stored) : [];
+
+        if (transactions.length === 0) {
+            transactions.push({
+                id: Date.now(),
+                description: 'Initial Balance',
+                amount: this.initialBalance,
+                category: 'Other',
+                type: 'income',
+                date: this.initialBalanceDate
+            });
+        }
+
+        return transactions;
+    }
+
+    setDefaultDateTime() {
+        const now = new Date();
+        const dateInput = document.getElementById('transaction-date');
+        const timeInput = document.getElementById('transaction-time');
+
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+
+        dateInput.value = `${year}-${month}-${day}`;
+        timeInput.value = `${hours}:${minutes}`;
     }
 
     saveTransactions() {
@@ -31,6 +62,8 @@ class BudgetApp {
         const amount = parseFloat(document.getElementById('amount').value);
         const category = document.getElementById('category').value;
         const type = document.querySelector('input[name="type"]:checked').value;
+        const date = document.getElementById('transaction-date').value;
+        const time = document.getElementById('transaction-time').value;
 
         const transaction = {
             id: Date.now(),
@@ -38,14 +71,16 @@ class BudgetApp {
             amount,
             category,
             type,
-            date: new Date().toISOString()
+            date: `${date}T${time}:00`
         };
 
         this.transactions.unshift(transaction);
+        this.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
         this.saveTransactions();
         this.updateUI();
         this.form.reset();
         document.querySelector('input[name="type"][value="expense"]').checked = true;
+        this.setDefaultDateTime();
     }
 
     deleteTransaction(id) {
@@ -85,7 +120,10 @@ class BudgetApp {
             <div class="transaction-item ${transaction.type}">
                 <div class="transaction-info">
                     <div class="transaction-description">${this.escapeHtml(transaction.description)}</div>
-                    <div class="transaction-category">${this.escapeHtml(transaction.category)}</div>
+                    <div class="transaction-meta">
+                        <span class="transaction-category">${this.escapeHtml(transaction.category)}</span>
+                        <span class="transaction-date">${this.formatDate(transaction.date)}</span>
+                    </div>
                 </div>
                 <div class="transaction-actions">
                     <div class="transaction-amount ${transaction.type}">
@@ -102,6 +140,34 @@ class BudgetApp {
             style: 'currency',
             currency: 'USD'
         }).format(Math.abs(amount));
+    }
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const transactionDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+        const diffTime = today - transactionDate;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        const timeStr = date.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        if (diffDays === 0) {
+            return `Today at ${timeStr}`;
+        } else if (diffDays === 1) {
+            return `Yesterday at ${timeStr}`;
+        } else {
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+            }) + ` at ${timeStr}`;
+        }
     }
 
     escapeHtml(text) {
