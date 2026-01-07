@@ -9,8 +9,14 @@ class BudgetApp {
     init() {
         this.form = document.getElementById('transaction-form');
         this.transactionList = document.getElementById('transaction-list');
+        this.exportJsonBtn = document.getElementById('export-json-btn');
+        this.exportCsvBtn = document.getElementById('export-csv-btn');
+        this.importFile = document.getElementById('import-file');
 
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        this.exportJsonBtn.addEventListener('click', () => this.exportJSON());
+        this.exportCsvBtn.addEventListener('click', () => this.exportCSV());
+        this.importFile.addEventListener('change', (e) => this.importBackup(e));
 
         this.updateUI();
         this.registerServiceWorker();
@@ -250,6 +256,86 @@ class BudgetApp {
                 : 'Notifications disabled';
             statusElement.className = enabled ? 'notification-enabled' : 'notification-disabled';
         }
+    }
+
+    exportJSON() {
+        const backup = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            initialBalance: this.initialBalance,
+            initialBalanceDate: this.initialBalanceDate,
+            transactions: this.transactions
+        };
+
+        const dataStr = JSON.stringify(backup, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `budget-backup-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    exportCSV() {
+        const headers = ['Date', 'Time', 'Description', 'Category', 'Type', 'Amount'];
+        const rows = this.transactions.map(t => {
+            const date = new Date(t.date);
+            return [
+                date.toLocaleDateString('en-US'),
+                date.toLocaleTimeString('en-US'),
+                `"${t.description.replace(/"/g, '""')}"`,
+                t.category,
+                t.type,
+                t.amount.toFixed(2)
+            ];
+        });
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.join(','))
+        ].join('\n');
+
+        const dataBlob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `budget-transactions-${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    importBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const backup = JSON.parse(e.target.result);
+
+                if (confirm('This will replace all current data. Continue?')) {
+                    if (backup.initialBalance) {
+                        this.initialBalance = backup.initialBalance;
+                    }
+                    if (backup.initialBalanceDate) {
+                        this.initialBalanceDate = backup.initialBalanceDate;
+                    }
+                    if (backup.transactions) {
+                        this.transactions = backup.transactions;
+                        this.saveTransactions();
+                        this.updateUI();
+                        alert('Backup restored successfully!');
+                    }
+                }
+            } catch (error) {
+                alert('Error importing backup: Invalid file format');
+                console.error('Import error:', error);
+            }
+
+            event.target.value = '';
+        };
+        reader.readAsText(file);
     }
 }
 
