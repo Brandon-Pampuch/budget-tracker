@@ -1,18 +1,23 @@
 class BudgetApp {
     constructor() {
         this.transactions = this.loadTransactions();
+        this.connectedAccounts = this.loadConnectedAccounts();
+        this.plaidLinkToken = null;
         this.init();
     }
 
     init() {
         this.form = document.getElementById('transaction-form');
         this.transactionList = document.getElementById('transaction-list');
+        this.linkBankButton = document.getElementById('link-bank-button');
 
         this.form.addEventListener('submit', (e) => this.handleSubmit(e));
+        this.linkBankButton.addEventListener('click', () => this.openPlaidLink());
 
         this.updateUI();
         this.registerServiceWorker();
         this.setupNotifications();
+        this.initializePlaid();
     }
 
     loadTransactions() {
@@ -184,6 +189,106 @@ class BudgetApp {
                 : 'Notifications disabled';
             statusElement.className = enabled ? 'notification-enabled' : 'notification-disabled';
         }
+    }
+
+    loadConnectedAccounts() {
+        const stored = localStorage.getItem('connectedAccounts');
+        return stored ? JSON.parse(stored) : [];
+    }
+
+    saveConnectedAccounts() {
+        localStorage.setItem('connectedAccounts', JSON.stringify(this.connectedAccounts));
+    }
+
+    async initializePlaid() {
+        const linkToken = await this.createLinkToken();
+        if (linkToken) {
+            this.plaidLinkToken = linkToken;
+        }
+        this.updateConnectedAccountsUI();
+    }
+
+    async createLinkToken() {
+        const savedToken = localStorage.getItem('plaidLinkToken');
+        if (savedToken) {
+            const tokenData = JSON.parse(savedToken);
+            if (new Date(tokenData.expiration) > new Date()) {
+                return tokenData.token;
+            }
+        }
+
+        console.log('Note: Plaid Link requires a backend server to generate tokens.');
+        console.log('For demo purposes, you can use Plaid Sandbox mode.');
+        return 'link-sandbox-demo-token';
+    }
+
+    openPlaidLink() {
+        if (!window.Plaid) {
+            alert('Plaid SDK is loading. Please try again in a moment.');
+            return;
+        }
+
+        const handler = window.Plaid.create({
+            token: this.plaidLinkToken,
+            onSuccess: (public_token, metadata) => {
+                this.handlePlaidSuccess(public_token, metadata);
+            },
+            onExit: (err, metadata) => {
+                if (err != null) {
+                    console.error('Plaid Link error:', err);
+                }
+            },
+            onEvent: (eventName, metadata) => {
+                console.log('Plaid event:', eventName, metadata);
+            }
+        });
+
+        handler.open();
+    }
+
+    async handlePlaidSuccess(publicToken, metadata) {
+        const account = {
+            id: Date.now(),
+            institutionName: metadata.institution.name,
+            institutionId: metadata.institution.institution_id,
+            accountName: metadata.accounts[0]?.name || 'Account',
+            accountId: metadata.accounts[0]?.id,
+            publicToken: publicToken,
+            connectedAt: new Date().toISOString()
+        };
+
+        this.connectedAccounts.push(account);
+        this.saveConnectedAccounts();
+        this.updateConnectedAccountsUI();
+
+        console.log('Bank connected! In production, send publicToken to your backend to exchange for access_token');
+        alert(`Successfully connected ${account.institutionName}!`);
+    }
+
+    disconnectAccount(accountId) {
+        this.connectedAccounts = this.connectedAccounts.filter(acc => acc.id !== accountId);
+        this.saveConnectedAccounts();
+        this.updateConnectedAccountsUI();
+    }
+
+    updateConnectedAccountsUI() {
+        const container = document.getElementById('connected-accounts');
+        if (this.connectedAccounts.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = this.connectedAccounts.map(account => `
+            <div class="connected-account">
+                <div class="account-info">
+                    <div class="account-name">${this.escapeHtml(account.institutionName)}</div>
+                    <div class="account-details">${this.escapeHtml(account.accountName)}</div>
+                </div>
+                <button class="btn-disconnect" onclick="app.disconnectAccount(${account.id})">
+                    Disconnect
+                </button>
+            </div>
+        `).join('');
     }
 }
 
