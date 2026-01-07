@@ -1,10 +1,10 @@
-const CACHE_NAME = 'budget-tracker-v1';
+const CACHE_NAME = 'budget-tracker-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/manifest.json'
+  '/budget-tracker/',
+  '/budget-tracker/index.html',
+  '/budget-tracker/styles.css',
+  '/budget-tracker/app.js',
+  '/budget-tracker/manifest.json'
 ];
 
 self.addEventListener('install', (event) => {
@@ -53,7 +53,7 @@ self.addEventListener('notificationclick', (event) => {
             }
           }
           if (clients.openWindow) {
-            return clients.openWindow('/');
+            return clients.openWindow('/budget-tracker/');
           }
         })
     );
